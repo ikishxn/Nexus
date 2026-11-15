@@ -1,0 +1,167 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-app: #ffffff;
+    --bg-surface: #ffffff;
+    --bg-surface-raised: #fafafa;
+    --text-main: #18181b;
+    --text-muted: #71717a;
+    --border-color: #e4e4e7;
+  }
+
+  html.dark {
+    --bg-app: #09090b;
+    --bg-surface: #09090b;
+    --bg-surface-raised: #18181b;
+    --text-main: #e4e4e7;
+    --text-muted: #71717a;
+    --border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  html.reading {
+    --bg-app: #f4efe2;
+    --bg-surface: #faf6eb;
+    --bg-surface-raised: #faf6eb;
+    --text-main: #2b261f;
+    --text-muted: #7c7263;
+    --border-color: #e1d8c5;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: var(--bg-app);
+    color: var(--text-main);
+    @apply font-sans antialiased transition-colors duration-500 ease-in-out;
+  }
+
+  ::selection {
+    @apply bg-rose-600/20 text-rose-900 dark:bg-rose-400/30 dark:text-rose-100;
+  }
+
+  /* Consistent, visible keyboard focus ring across both themes. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-rose-500 ring-offset-2 ring-offset-white dark:ring-offset-surface;
+  }
+
+  /* Slim, theme-aware scrollbars for the chat drawer and comment threads. */
+  .themed-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(203 213 225) transparent;
+  }
+  .dark .themed-scrollbar {
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  }
+  .themed-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .themed-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgb(203 213 225);
+    border-radius: 9999px;
+  }
+  .dark .themed-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.15);
+  }
+}
+
+@keyframes slideInFromTop {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-in {
+  animation-duration: 220ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: both;
+}
+
+.slide-in-from-top-2 {
+  animation-name: slideInFromTop;
+}
+
+@keyframes floatUpFade {
+  0% {
+    opacity: 0;
+    transform: translateY(2px) scale(0.85);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(-6px) scale(1.1);
+  }
+  75% {
+    opacity: 1;
+    transform: translateY(-16px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-26px) scale(0.9);
+  }
+}
+
+.animate-float-fade {
+  animation: floatUpFade 950ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: none;
+}
+
+/* Reading Mode Custom Styles and Overrides */
+html.reading body {
+  background-color: var(--bg-app) !important;
+  color: var(--text-main) !important;
+}
+
+html.reading .bg-white {
+  background-color: var(--bg-surface) !important;
+}
+
+html.reading .bg-zinc-50,
+html.reading .dark\:bg-surface-raised,
+html.reading .dark\:bg-white\/5 {
+  background-color: var(--bg-surface-raised) !important;
+}
+
+html.reading .text-zinc-900,
+html.reading .dark\:text-white {
+  color: var(--text-main) !important;
+}
+
+html.reading .text-zinc-700,
+html.reading .text-zinc-800,
+html.reading .dark\:text-zinc-350,
+html.reading .dark\:text-zinc-300 {
+  color: var(--text-main) !important;
+}
+
+html.reading .text-zinc-600,
+html.reading .text-zinc-500,
+html.reading .text-zinc-400,
+html.reading .dark\:text-zinc-400,
+html.reading .dark\:text-zinc-500 {
+  color: var(--text-muted) !important;
+}
+
+html.reading .border-zinc-200,
+html.reading .border-zinc-100,
+html.reading .border-zinc-250,
+html.reading .dark\:border-white\/10,
+html.reading .dark\:border-white\/5 {
+  border-color: var(--border-color) !important;
+}
+
+html.reading .themed-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+}
+
