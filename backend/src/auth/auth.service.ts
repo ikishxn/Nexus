@@ -53,8 +53,37 @@ export class AuthService {
     ]);
 
     if (existingEmail) {
-      throw new ConflictException('Email is already registered');
+      if (existingEmail.isVerified === false) {
+        // User registered previously but never verified. Update credentials and resend verification.
+        const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+
+        existingEmail.username = dto.username;
+        existingEmail.passwordHash = passwordHash;
+        existingEmail.verificationToken = verificationToken;
+        await existingEmail.save();
+
+        const frontendUrl =
+          this.configService.get<string>('FRONTEND_URL') ||
+          process.env.FRONTEND_URL ||
+          'http://localhost:5173';
+        const verifyUrl = `${frontendUrl}/#/verify-email/${verificationToken}`;
+
+        this.mailService
+          .sendVerificationEmail(existingEmail.email, verifyUrl, existingEmail.username)
+          .catch((err) =>
+            this.logger.error(`Failed to dispatch verification email to ${existingEmail.email}: ${err.message}`),
+          );
+
+        return {
+          message: 'Registration updated! Please check your email to verify your account.',
+          email: existingEmail.email,
+        };
+      }
+
+      throw new ConflictException('Email is already registered. Please sign in instead.');
     }
+
     if (existingUsername) {
       throw new ConflictException('Username is already taken');
     }
@@ -76,7 +105,12 @@ export class AuthService {
       'http://localhost:5173';
     const verifyUrl = `${frontendUrl}/#/verify-email/${verificationToken}`;
 
-    await this.mailService.sendVerificationEmail(user.email, verifyUrl, user.username);
+    // Dispatch verification email in background without blocking registration response
+    this.mailService
+      .sendVerificationEmail(user.email, verifyUrl, user.username)
+      .catch((err) =>
+        this.logger.error(`Failed to dispatch verification email to ${user.email}: ${err.message}`),
+      );
 
     return {
       message: 'Registration successful! Please check your email to verify your account before logging in.',
@@ -114,9 +148,19 @@ export class AuthService {
     }
 
     if (user.isVerified === false) {
-      throw new ForbiddenException(
-        'Please verify your email address before logging in. Check your inbox for the verification link.',
-      );
+      const strictVerification =
+        this.configService.get<string>('REQUIRE_EMAIL_VERIFICATION') === 'true' ||
+        process.env.REQUIRE_EMAIL_VERIFICATION === 'true';
+
+      if (strictVerification) {
+        throw new ForbiddenException(
+          'Please verify your email address before logging in. Check your inbox for the verification link.',
+        );
+      }
+
+      // If strict verification is disabled (default until Resend/SMTP is configured in production), auto-verify on valid login
+      await this.usersService.verifyUser(user._id);
+      this.logger.log(`Auto-verified user ${user.email} on valid credentials login.`);
     }
 
     return this.buildAuthResponse(user);

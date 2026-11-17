@@ -31,6 +31,9 @@ export class MailService {
         this.transporter = nodemailer.createTransport({
           service: 'gmail',
           auth: { user, pass },
+          connectionTimeout: 5000,
+          greetingTimeout: 5000,
+          socketTimeout: 5000,
         });
       } else {
         this.transporter = nodemailer.createTransport({
@@ -38,6 +41,9 @@ export class MailService {
           port,
           secure: port === 465,
           auth: { user, pass },
+          connectionTimeout: 5000,
+          greetingTimeout: 5000,
+          socketTimeout: 5000,
         });
       }
       this.logger.log(`SMTP Mail transporter initialized (User: ${user})`);
