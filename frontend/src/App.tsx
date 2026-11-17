@@ -9,6 +9,9 @@ import PostDetailPage from './components/PostDetailPage';
 import ChatDrawer from './components/ChatDrawer';
 import LandingPage from './components/LandingPage';
 import AuthPage from './components/AuthPage';
+import ForgotPasswordPage from './components/ForgotPasswordPage';
+import ResetPasswordPage from './components/ResetPasswordPage';
+import VerifyEmailPage from './components/VerifyEmailPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -106,6 +109,18 @@ function AppContent() {
           <Route 
             path="/auth"
             element={<AuthPage />}
+          />
+          <Route 
+            path="/forgot-password"
+            element={<ForgotPasswordPage />}
+          />
+          <Route 
+            path="/reset-password/:token"
+            element={<ResetPasswordPage />}
+          />
+          <Route 
+            path="/verify-email/:token"
+            element={<VerifyEmailPage />}
           />
           <Route 
             path="/" 

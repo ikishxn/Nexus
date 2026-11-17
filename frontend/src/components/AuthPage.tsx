@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Network, Mail, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { useState, useEffect, type FormEvent } from 'react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { Network, Mail, Lock, User, ArrowRight, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../lib/api';
 
 export default function AuthPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [isSignUp, setIsSignUp] = useState(false);
   const [username, setUsername] = useState('');
@@ -16,15 +17,60 @@ export default function AuthPage() {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
+  const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Check for Google OAuth redirect token or email verification flags in URL
+  useEffect(() => {
+    const token = searchParams.get('token');
+    const verified = searchParams.get('verified');
+    const oauthError = searchParams.get('error');
+
+    if (token) {
+      // Process Google OAuth redirect
+      const handleOAuthToken = async () => {
+        setIsSubmitting(true);
+        try {
+          const res = await fetch(`${API_BASE_URL}/auth/me`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (res.ok) {
+            const userData = await res.json();
+            login(token, userData);
+            navigate('/', { replace: true });
+          } else {
+            setError('Failed to authenticate.');
+          }
+        } catch {
+          setError('Network error validating authentication.');
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+      handleOAuthToken();
+    }
+
+    if (verified === 'true') {
+      setSuccessNotice('Your email has been verified successfully! You can now sign in.');
+      setIsSignUp(false);
+      setSearchParams({});
+    } else if (oauthError) {
+      setError(decodeURIComponent(oauthError));
+      setSearchParams({});
+    }
+  }, [searchParams, login, navigate, setSearchParams]);
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccessNotice(null);
     setIsSubmitting(true);
 
     try {
       const endpoint = isSignUp ? '/auth/register' : '/auth/login';
-      const payload = isSignUp ? { username, email, password } : { email, password };
+      const payload = isSignUp ? { username: username.trim(), email: email.trim().toLowerCase(), password } : { email: email.trim().toLowerCase(), password };
 
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
@@ -34,45 +80,28 @@ export default function AuthPage() {
         body: JSON.stringify(payload),
       });
 
+      const data = await response.json().catch(() => ({}));
+
       if (!response.ok) {
-        const body = await response.json().catch(() => ({ message: 'Authentication failed' }));
-        const httpErr = new Error(body.message || 'Authentication failed');
-        (httpErr as any).isHttpError = true;
-        throw httpErr;
+        throw new Error(data.message || 'Authentication failed');
       }
 
-      const data = await response.json();
-      
-      login(data.accessToken, data.user || {
-        _id: data.userId || data.id,
-        username: data.username,
-        email: data.email,
-        walletBalance: data.walletBalance ?? 100,
-        reputationScore: data.reputationScore ?? 0,
-      });
-
-      navigate('/');
+      if (isSignUp) {
+        // Phase 3: Registration requires email verification before login
+        setRegisteredEmail(email);
+      } else {
+        // Sign In successful
+        login(data.accessToken, data.user || {
+          _id: data.userId || data.id,
+          username: data.username,
+          email: data.email,
+          walletBalance: data.walletBalance ?? 100,
+          reputationScore: data.reputationScore ?? 0,
+        });
+        navigate('/');
+      }
     } catch (err: any) {
-      if (err.isHttpError) {
-        setError(err.message);
-        return;
-      }
-
-      console.warn('Backend API connection failed. Using mock auth simulation as fallback.', err);
-      
-      // Simulating API loading latency
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      const simulatedUser = {
-        username: username || email.split('@')[0] || 'developer_pro',
-        email: email,
-        walletBalance: 100,
-        reputationScore: 25,
-        badges: ['Early Adopter', 'Verified Developer'],
-      };
-
-      login('mock-jwt-token-abcd-1234', simulatedUser);
-      navigate('/');
+      setError(err.message || 'Authentication failed. Please check your credentials.');
     } finally {
       setIsSubmitting(false);
     }
@@ -94,145 +123,196 @@ export default function AuthPage() {
       <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-zinc-900/60 p-8 shadow-2xl backdrop-blur-xl">
         
         {/* Brand Header */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-600 shadow-lg shadow-rose-600/25 animate-bounce">
+        <div className="flex flex-col items-center mb-6">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-600 shadow-lg shadow-rose-600/25">
             <Network className="h-6 w-6 text-white" strokeWidth={2.5} />
           </div>
           <h2 className="mt-4 text-2xl font-black tracking-tight text-white">
-            {isSignUp ? 'Create your account' : 'Welcome to Nexus'}
+            {registeredEmail ? 'Verify Your Email' : isSignUp ? 'Create your account' : 'Welcome to Nexus'}
           </h2>
-          <p className="mt-1.5 text-sm text-zinc-400">
-            {isSignUp ? 'Get real feedback on your code and UI' : 'Sign in to review and share knowledge'}
+          <p className="mt-1 text-sm text-zinc-400 text-center">
+            {registeredEmail 
+              ? 'Account activation link sent'
+              : isSignUp 
+                ? 'Join verified developers sharing real architectural insights' 
+                : 'Sign in to review code, answer bounties, and share knowledge'}
           </p>
         </div>
 
-        {/* Form Toggle Slider Tabs */}
-        <div className="flex bg-zinc-950 p-1 rounded-2xl border border-white/5 mb-6">
-          <button
-            type="button"
-            onClick={() => {
-              setIsSignUp(false);
-              setError(null);
-            }}
-            className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all duration-200 ${
-              !isSignUp 
-                ? 'bg-rose-600 text-white shadow-md' 
-                : 'text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setIsSignUp(true);
-              setError(null);
-            }}
-            className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all duration-200 ${
-              isSignUp 
-                ? 'bg-rose-600 text-white shadow-md' 
-                : 'text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            Create Account
-          </button>
-        </div>
-
-        {/* Error message */}
-        {error && (
-          <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3.5 text-xs font-semibold text-red-300">
-            {error}
+        {/* Success Notice / Verification alert */}
+        {successNotice && (
+          <div className="mb-4 flex items-start gap-2.5 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-3.5 text-xs font-semibold text-emerald-300">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
+            <span>{successNotice}</span>
           </div>
         )}
 
-        {/* Form Submission */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          
-          {/* Username (Register only) */}
-          {isSignUp && (
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-                Username
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500">
-                  <User className="h-4 w-4" />
-                </span>
-                <input
-                  type="text"
-                  required={isSignUp}
-                  placeholder="developer_pro"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-zinc-950 py-2.5 pl-10 pr-4 text-sm text-white placeholder-zinc-600 outline-none transition-all duration-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Email */}
-          <div className="space-y-1.5">
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-              Email Address
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500">
-                <Mail className="h-4 w-4" />
-              </span>
-              <input
-                type="email"
-                required
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-zinc-950 py-2.5 pl-10 pr-4 text-sm text-white placeholder-zinc-600 outline-none transition-all duration-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
-              />
-            </div>
+        {/* Error message */}
+        {error && (
+          <div className="mb-4 flex items-start gap-2.5 rounded-2xl border border-red-500/20 bg-red-500/10 p-3.5 text-xs font-semibold text-red-300">
+            <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
+            <span>{error}</span>
           </div>
+        )}
 
-          {/* Password */}
-          <div className="space-y-1.5">
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-              Password
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500">
-                <Lock className="h-4 w-4" />
-              </span>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-zinc-950 py-2.5 pl-10 pr-12 text-sm text-white placeholder-zinc-600 outline-none transition-all duration-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
-              />
+        {registeredEmail ? (
+          /* Registration Success State (Phase 3 Requirement) */
+          <div className="space-y-6">
+            <div className="flex flex-col items-center text-center p-6 rounded-2xl border border-rose-500/20 bg-rose-500/10 text-zinc-200">
+              <Mail className="h-10 w-10 text-rose-400 mb-3 animate-pulse" />
+              <h3 className="text-base font-bold text-white mb-2">Check your email</h3>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                We've sent a verification link to <strong className="text-rose-400">{registeredEmail}</strong>. Please check your inbox and click the link to activate your account before signing in.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setRegisteredEmail(null);
+                setIsSignUp(false);
+                setError(null);
+              }}
+              className="w-full h-11 inline-flex items-center justify-center font-bold px-6 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/20 transition-all text-sm gap-2"
+            >
+              <span>Back to Sign In</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Form Toggle Slider Tabs */}
+            <div className="flex bg-zinc-950 p-1 rounded-2xl border border-white/5 mb-5">
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-zinc-500 hover:text-zinc-350 transition-colors"
+                onClick={() => {
+                  setIsSignUp(false);
+                  setError(null);
+                }}
+                className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all duration-200 ${
+                  !isSignUp 
+                    ? 'bg-rose-600 text-white shadow-md' 
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
               >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSignUp(true);
+                  setError(null);
+                }}
+                className={`flex-1 py-2 text-sm font-bold rounded-xl transition-all duration-200 ${
+                  isSignUp 
+                    ? 'bg-rose-600 text-white shadow-md' 
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                Create Account
               </button>
             </div>
-          </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full mt-4 h-11 inline-flex items-center justify-center font-bold px-6 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/20 disabled:bg-rose-600/50 disabled:cursor-not-allowed transition-all duration-200 transform hover:-translate-y-0.5 active:scale-98 text-sm gap-2"
-          >
-            {isSubmitting ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-            ) : (
-              <>
-                <span>{isSignUp ? 'Create Account' : 'Sign In'}</span>
-                <ArrowRight className="h-4 w-4" />
-              </>
-            )}
-          </button>
-        </form>
+            {/* Form Submission */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              
+              {/* Username (Register only) */}
+              {isSignUp && (
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+                    Username
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500">
+                      <User className="h-4 w-4" />
+                    </span>
+                    <input
+                      type="text"
+                      required={isSignUp}
+                      placeholder="developer_pro"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="w-full rounded-2xl border border-white/10 bg-zinc-950 py-2.5 pl-10 pr-4 text-sm text-white placeholder-zinc-600 outline-none transition-all duration-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Email */}
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500">
+                    <Mail className="h-4 w-4" />
+                  </span>
+                  <input
+                    type="email"
+                    required
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full rounded-2xl border border-white/10 bg-zinc-950 py-2.5 pl-10 pr-4 text-sm text-white placeholder-zinc-600 outline-none transition-all duration-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+                    Password
+                  </label>
+                  {!isSignUp && (
+                    <Link
+                      to="/forgot-password"
+                      className="text-[11px] font-semibold text-rose-400 hover:text-rose-300 transition-colors"
+                    >
+                      Forgot password?
+                    </Link>
+                  )}
+                </div>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-500">
+                    <Lock className="h-4 w-4" />
+                  </span>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full rounded-2xl border border-white/10 bg-zinc-950 py-2.5 pl-10 pr-12 text-sm text-white placeholder-zinc-600 outline-none transition-all duration-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-zinc-500 hover:text-zinc-350 transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full mt-3 h-11 inline-flex items-center justify-center font-bold px-6 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/20 disabled:bg-rose-600/50 disabled:cursor-not-allowed transition-all duration-200 transform hover:-translate-y-0.5 active:scale-98 text-sm gap-2"
+              >
+                {isSubmitting ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <>
+                    <span>{isSignUp ? 'Create Account' : 'Sign In'}</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );

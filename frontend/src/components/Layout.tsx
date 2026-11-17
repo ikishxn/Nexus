@@ -310,21 +310,22 @@ function Header({
         'sticky top-0 z-40 border-b border-zinc-200 bg-white/80 backdrop-blur-md',
         'dark:border-white/10 dark:bg-surface/80',
         'transition-colors duration-500 ease-in-out',
+        'w-full max-w-[100vw] box-border overflow-hidden',
       )}
     >
-      <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
-        <div className="flex items-center gap-3 md:gap-6 shrink-0">
+      <div className="container mx-auto flex h-16 items-center justify-between gap-2 sm:gap-4 px-3 sm:px-4 w-full max-w-[100vw] box-border">
+        <div className="flex items-center gap-2 md:gap-6 shrink-0 min-w-0">
           {/* Mobile Hamburger Menu Toggle */}
           <button
             type="button"
             onClick={onToggleMobileNav}
             aria-label="Open navigation menu"
-            className="md:hidden flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 hover:text-rose-500 hover:border-rose-500/30 transition-colors cursor-pointer"
+            className="md:hidden flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 hover:text-rose-500 hover:border-rose-500/30 transition-colors cursor-pointer shrink-0"
           >
             <Menu className="h-5 w-5" />
           </button>
           <Logo />
-          <nav className="hidden lg:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1 shrink-0">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.to}
@@ -346,7 +347,7 @@ function Header({
         <button
           type="button"
           onClick={onOpenSearch}
-          className="flex-1 max-w-md mx-4 relative hidden sm:flex items-center gap-2.5 rounded-full border border-zinc-200 bg-zinc-100/80 hover:bg-zinc-200/60 dark:border-zinc-800 dark:bg-zinc-900/90 dark:hover:bg-zinc-800/90 py-1.5 pl-3.5 pr-2.5 text-sm text-zinc-500 dark:text-zinc-400 hover:border-rose-500/40 dark:hover:border-rose-500/40 transition-all duration-200 shadow-inner group cursor-pointer"
+          className="flex-1 min-w-0 max-w-md mx-2 sm:mx-4 relative hidden sm:flex items-center gap-2.5 rounded-full border border-zinc-200 bg-zinc-100/80 hover:bg-zinc-200/60 dark:border-zinc-800 dark:bg-zinc-900/90 dark:hover:bg-zinc-800/90 py-1.5 pl-3.5 pr-2.5 text-sm text-zinc-500 dark:text-zinc-400 hover:border-rose-500/40 dark:hover:border-rose-500/40 transition-all duration-200 shadow-inner group cursor-pointer shrink"
         >
           <Search className="h-4 w-4 text-zinc-400 group-hover:text-rose-500 transition-colors shrink-0" />
           <span className="flex-1 text-left text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-700 dark:group-hover:text-zinc-200 transition-colors truncate">
@@ -359,19 +360,25 @@ function Header({
           </div>
         </button>
 
-        <div className="flex items-center gap-3 shrink-0">
-          <ThemeToggle />
-          {isAuthenticated && user && <NotificationBell />}
-          <div className="mx-1 h-5 w-px bg-zinc-200 dark:bg-white/10" />
+        <div className="flex items-center gap-1.5 sm:gap-2.5 md:gap-3 flex-shrink min-w-0">
+          <div className="flex-shrink-0">
+            <ThemeToggle />
+          </div>
+          {isAuthenticated && user && (
+            <div className="flex-shrink-0">
+              <NotificationBell />
+            </div>
+          )}
+          <div className="hidden xs:block mx-0.5 sm:mx-1 h-5 w-px bg-zinc-200 dark:bg-white/10 flex-shrink-0" />
           
           {isAuthenticated && user ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 md:gap-3 flex-shrink min-w-0">
               <Link
                 to="/wallet"
                 title={`Live Balance: ${user.walletBalance ?? 0} cr (Click to manage Wallet)`}
-                className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-100/80 px-3 py-1 text-xs font-bold text-zinc-800 shadow-sm transition-all hover:scale-105 hover:border-rose-400/50 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/90 dark:text-zinc-200 dark:hover:border-rose-500/30 cursor-pointer"
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-100/80 px-2.5 sm:px-3 py-1 text-xs font-bold text-zinc-800 shadow-sm transition-all hover:scale-105 hover:border-rose-400/50 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/90 dark:text-zinc-200 dark:hover:border-rose-500/30 cursor-pointer flex-shrink-0"
               >
-                <Coins className="h-3.5 w-3.5 text-amber-500 animate-pulse" />
+                <Coins className="h-3.5 w-3.5 text-amber-500 animate-pulse flex-shrink-0" />
                 <span>{user.walletBalance ?? 0}</span>
                 <span className="text-[10px] font-semibold text-rose-600 dark:text-rose-400">cr</span>
               </Link>
@@ -379,35 +386,41 @@ function Header({
               <Link
                 to="/profile"
                 title={`${user.username} - View Profile`}
-                className="flex items-center gap-2 hover:opacity-85 transition-opacity cursor-pointer"
+                className="flex items-center gap-1.5 sm:gap-2 hover:opacity-85 transition-opacity cursor-pointer flex-shrink min-w-0"
               >
-                <div className="hidden md:block text-right leading-tight">
-                  <p className="text-xs font-bold text-zinc-900 dark:text-white">{user.username}</p>
-                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
-                    {user.totalReputation ?? user.reputationScore} reputation
+                <div className="hidden lg:block text-right leading-tight max-w-[100px] truncate">
+                  <p className="text-xs font-bold text-zinc-900 dark:text-white truncate">{user.username}</p>
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 truncate">
+                    {user.totalReputation ?? user.reputationScore} rep
                   </p>
                 </div>
    
                 <div 
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-rose-500 to-purple-600 text-xs font-bold text-white shadow-sm ring-2 ring-white/10 select-none"
+                  className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-rose-500 to-purple-600 text-xs font-bold text-white shadow-sm ring-2 ring-white/10 select-none"
                 >
                   {user.username.slice(0, 2).toUpperCase()}
                 </div>
               </Link>
 
-              <Button variant="ghost" size="sm" onClick={() => { logout(); navigate('/auth'); }}>
-                Sign out
-              </Button>
+              <div className="flex-shrink-0">
+                <Button variant="ghost" size="sm" onClick={() => { logout(); navigate('/auth'); }} className="whitespace-nowrap px-2 sm:px-3">
+                  Sign out
+                </Button>
+              </div>
             </div>
           ) : (
-            <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>
-              Sign in
-            </Button>
+            <div className="flex-shrink-0">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/auth')} className="whitespace-nowrap px-2 sm:px-3">
+                Sign in
+              </Button>
+            </div>
           )}
 
-          <Button variant="primary" size="sm" onClick={onNewPostClick}>
-            New post
-          </Button>
+          <div className="flex-shrink-0">
+            <Button variant="primary" size="sm" onClick={onNewPostClick} className="whitespace-nowrap px-2.5 sm:px-3">
+              New post
+            </Button>
+          </div>
         </div>
       </div>
     </header>
@@ -766,7 +779,7 @@ export default function Layout({
   }, [category, setPostCategory]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-white dark:bg-surface transition-colors duration-500 ease-in-out">
+    <div className="flex min-h-screen flex-col bg-white dark:bg-surface transition-colors duration-500 ease-in-out w-full max-w-[100vw] overflow-x-hidden box-border">
       <Header 
         currentUser={currentUser}
         onSignInClick={onSignInClick}

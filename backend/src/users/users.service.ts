@@ -19,7 +19,14 @@ export class UsersService {
     @InjectConnection() private readonly connection: Connection,
   ) {}
 
-  async create(data: { username: string; email: string; passwordHash: string }): Promise<UserDocument> {
+  async create(data: {
+    username: string;
+    email: string;
+    passwordHash?: string;
+    isVerified?: boolean;
+    verificationToken?: string | null;
+    googleId?: string | null;
+  }): Promise<UserDocument> {
     const count = await this.userModel.countDocuments().exec();
     const isFirstUser = count === 0;
     const isAdminText = data.username.toLowerCase().includes('admin') || data.email.toLowerCase().includes('admin');
@@ -30,7 +37,7 @@ export class UsersService {
   }
 
   async findByEmail(email: string): Promise<UserDocument | null> {
-    return this.userModel.findOne({ email: email.toLowerCase() }).select('+passwordHash').exec();
+    return this.userModel.findOne({ email: email.toLowerCase() }).select('+passwordHash +resetPasswordToken +resetPasswordExpires +verificationToken').exec();
   }
 
   async findByUsername(username: string): Promise<UserDocument | null> {
@@ -39,6 +46,75 @@ export class UsersService {
 
   async findById(id: string | Types.ObjectId): Promise<UserDocument | null> {
     return this.userModel.findById(id).exec();
+  }
+
+  async setResetPasswordToken(email: string, tokenHash: string, expires: Date): Promise<UserDocument | null> {
+    return this.userModel
+      .findOneAndUpdate(
+        { email: email.toLowerCase() },
+        {
+          $set: {
+            resetPasswordToken: tokenHash,
+            resetPasswordExpires: expires,
+          },
+        },
+        { new: true },
+      )
+      .exec();
+  }
+
+  async findByResetPasswordToken(tokenHash: string): Promise<UserDocument | null> {
+    return this.userModel
+      .findOne({
+        resetPasswordToken: tokenHash,
+        resetPasswordExpires: { $gt: new Date() },
+      })
+      .select('+passwordHash +resetPasswordToken +resetPasswordExpires')
+      .exec();
+  }
+
+  async resetPassword(userId: string | Types.ObjectId, newPasswordHash: string): Promise<UserDocument | null> {
+    return this.userModel
+      .findByIdAndUpdate(
+        userId,
+        {
+          $set: {
+            passwordHash: newPasswordHash,
+            resetPasswordToken: null,
+            resetPasswordExpires: null,
+          },
+        },
+        { new: true },
+      )
+      .exec();
+  }
+
+  async findByVerificationToken(token: string): Promise<UserDocument | null> {
+    return this.userModel
+      .findOne({
+        verificationToken: token,
+      })
+      .select('+verificationToken')
+      .exec();
+  }
+
+  async verifyUser(userId: string | Types.ObjectId): Promise<UserDocument | null> {
+    return this.userModel
+      .findByIdAndUpdate(
+        userId,
+        {
+          $set: {
+            isVerified: true,
+            verificationToken: null,
+          },
+        },
+        { new: true },
+      )
+      .exec();
+  }
+
+  async findByGoogleId(googleId: string): Promise<UserDocument | null> {
+    return this.userModel.findOne({ googleId }).exec();
   }
 
   async getTopContributors(limit = 10): Promise<UserDocument[]> {
