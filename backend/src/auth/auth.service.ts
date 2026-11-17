@@ -44,7 +44,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   async register(dto: RegisterDto): Promise<{ message: string; email: string }> {
     const [existingEmail, existingUsername] = await Promise.all([
@@ -184,7 +184,6 @@ export class AuthService {
     await this.usersService.setResetPasswordToken(user.email, hashedToken, expires);
 
     const frontendUrl =
-      this.configService.get<string>('FRONTEND_URL') ||
       process.env.FRONTEND_URL ||
       'http://localhost:5173';
     const resetUrl = `${frontendUrl}/#/reset-password/${rawToken}`;

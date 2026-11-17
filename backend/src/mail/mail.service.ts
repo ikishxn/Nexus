@@ -1,69 +1,31 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
 import { Resend } from 'resend';
 
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private transporter: nodemailer.Transporter | null = null;
   private resend: Resend | null = null;
 
   constructor(private readonly configService: ConfigService) {
-    this.initializeTransporter();
+    this.initializeResend();
   }
 
-  private initializeTransporter() {
-    const resendKey =
+  private initializeResend() {
+    const apiKey =
       this.configService.get<string>('RESEND_API_KEY') || process.env.RESEND_API_KEY;
-    if (resendKey) {
-      this.resend = new Resend(resendKey);
-      this.logger.log('Resend HTTPS API initialized (bypasses cloud SMTP port restrictions)');
-    }
 
-    const host = this.configService.get<string>('SMTP_HOST') || 'smtp.gmail.com';
-    const port = Number(this.configService.get<number>('SMTP_PORT')) || 587;
-    const user = this.configService.get<string>('SMTP_USER') || process.env.SMTP_USER;
-    const pass = this.configService.get<string>('SMTP_PASS') || process.env.SMTP_PASS;
-
-    if (user && pass) {
-      if (user.includes('@gmail.com') || host.includes('gmail')) {
-        this.transporter = nodemailer.createTransport({
-          service: 'gmail',
-          auth: { user, pass },
-          connectionTimeout: 5000,
-          greetingTimeout: 5000,
-          socketTimeout: 5000,
-        });
-      } else {
-        this.transporter = nodemailer.createTransport({
-          host,
-          port,
-          secure: port === 465,
-          auth: { user, pass },
-          connectionTimeout: 5000,
-          greetingTimeout: 5000,
-          socketTimeout: 5000,
-        });
-      }
-      this.logger.log(`SMTP Mail transporter initialized (User: ${user})`);
-    } else if (!resendKey) {
+    if (apiKey) {
+      this.resend = new Resend(apiKey);
+      this.logger.log('Resend email client initialized successfully (Port 443 HTTPS).');
+    } else {
       this.logger.warn(
-        'Neither RESEND_API_KEY nor SMTP credentials (SMTP_USER, SMTP_PASS) provided. Emails will be logged to console in dev mode.',
+        'RESEND_API_KEY is not configured. Outgoing emails will be logged to the console in dev mode.',
       );
     }
   }
 
   private getFromAddress(): string {
-    return (
-      this.configService.get<string>('SMTP_FROM') ||
-      this.configService.get<string>('SMTP_USER') ||
-      process.env.SMTP_USER ||
-      'no-reply@nexus-dev.com'
-    );
-  }
-
-  private getResendFromAddress(): string {
     return (
       this.configService.get<string>('RESEND_FROM') ||
       process.env.RESEND_FROM ||
@@ -82,11 +44,11 @@ export class MailService {
     if (!userEmail) return false;
 
     const subject = '🔒 Reset Your Nexus Password';
-    const fromAddress = this.getFromAddress();
+    const from = this.getFromAddress();
 
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #09090b; color: #f4f4f5; border-radius: 16px; border: 1px solid #27272a; overflow: hidden; padding: 24px;">
-        <div style="display: flex; items-center; margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; margin-bottom: 20px;">
           <h2 style="color: #f43f5e; margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.5px;">Nexus</h2>
           <span style="margin-left: 8px; color: #a1a1aa; font-size: 13px;">• Verified Knowledge Network</span>
         </div>
@@ -123,29 +85,19 @@ export class MailService {
 
     try {
       if (this.resend) {
-        const from = this.getResendFromAddress();
         const { data, error } = await this.resend.emails.send({
           from,
           to: userEmail,
           subject,
           html,
         });
+
         if (error) {
-          this.logger.error(`Resend API failed to send password reset to ${userEmail}: ${error.message}`);
+          this.logger.error(`Resend API failed to send password reset email to ${userEmail}: ${error.message}`);
           return false;
         }
-        this.logger.log(`Password reset email successfully sent via Resend to ${userEmail} (ID: ${data?.id})`);
-        return true;
-      }
 
-      if (this.transporter) {
-        const info = await this.transporter.sendMail({
-          from: `"Nexus Security" <${fromAddress}>`,
-          to: userEmail,
-          subject,
-          html,
-        });
-        this.logger.log(`Password reset email successfully sent to ${userEmail} (MessageId: ${info.messageId})`);
+        this.logger.log(`Password reset email successfully sent via Resend to ${userEmail} (ID: ${data?.id})`);
         return true;
       }
 
@@ -168,11 +120,11 @@ export class MailService {
     if (!userEmail) return false;
 
     const subject = '✉️ Verify Your Nexus Account';
-    const fromAddress = this.getFromAddress();
+    const from = this.getFromAddress();
 
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #09090b; color: #f4f4f5; border-radius: 16px; border: 1px solid #27272a; overflow: hidden; padding: 24px;">
-        <div style="display: flex; items-center; margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; margin-bottom: 20px;">
           <h2 style="color: #f43f5e; margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.5px;">Nexus</h2>
           <span style="margin-left: 8px; color: #a1a1aa; font-size: 13px;">• Verified Knowledge Network</span>
         </div>
@@ -205,29 +157,19 @@ export class MailService {
 
     try {
       if (this.resend) {
-        const from = this.getResendFromAddress();
         const { data, error } = await this.resend.emails.send({
           from,
           to: userEmail,
           subject,
           html,
         });
+
         if (error) {
           this.logger.error(`Resend API failed to send verification email to ${userEmail}: ${error.message}`);
           return false;
         }
-        this.logger.log(`Verification email successfully sent via Resend to ${userEmail} (ID: ${data?.id})`);
-        return true;
-      }
 
-      if (this.transporter) {
-        const info = await this.transporter.sendMail({
-          from: `"Nexus" <${fromAddress}>`,
-          to: userEmail,
-          subject,
-          html,
-        });
-        this.logger.log(`Verification email successfully sent to ${userEmail} (MessageId: ${info.messageId})`);
+        this.logger.log(`Verification email successfully sent via Resend to ${userEmail} (ID: ${data?.id})`);
         return true;
       }
 
@@ -251,7 +193,7 @@ export class MailService {
     if (!userEmail) return false;
 
     const subject = `💰 New Answer on your Bounty Question: "${postTitle.slice(0, 40)}..."`;
-    const fromAddress = this.getFromAddress();
+    const from = this.getFromAddress();
 
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #09090b; color: #f4f4f5; border-radius: 16px; border: 1px solid #27272a; overflow: hidden; padding: 24px;">
@@ -284,28 +226,23 @@ export class MailService {
 
     try {
       if (this.resend) {
-        const from = this.getResendFromAddress();
-        await this.resend.emails.send({
+        const { data, error } = await this.resend.emails.send({
           from,
           to: userEmail,
           subject,
           html,
         });
-        this.logger.log(`Bounty alert email successfully sent via Resend to ${userEmail}`);
+
+        if (error) {
+          this.logger.error(`Resend API failed to send bounty alert to ${userEmail}: ${error.message}`);
+          return false;
+        }
+
+        this.logger.log(`Bounty alert email successfully sent via Resend to ${userEmail} (ID: ${data?.id})`);
         return true;
       }
 
-      if (this.transporter) {
-        await this.transporter.sendMail({
-          from: `"Nexus Bounties" <${fromAddress}>`,
-          to: userEmail,
-          subject,
-          html,
-        });
-        this.logger.log(`Bounty alert email successfully sent to ${userEmail}`);
-      } else {
-        this.logger.log(`[Dev Email Simulation] Bounty Alert to ${userEmail}: "${postTitle}" by ${answerAuthor}`);
-      }
+      this.logger.log(`[Dev Email Simulation] Bounty Alert to ${userEmail}: "${postTitle}" by ${answerAuthor}`);
       return true;
     } catch (error: any) {
       this.logger.error(`Failed to send bounty alert email to ${userEmail}: ${error.message}`);
@@ -325,7 +262,7 @@ export class MailService {
     if (!userEmail) return false;
 
     const subject = `You have been requested for a ${bountyAmount} cr bounty on Nexus`;
-    const fromAddress = this.getFromAddress();
+    const from = this.getFromAddress();
 
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #09090b; color: #f4f4f5; border-radius: 16px; border: 1px solid #27272a; overflow: hidden; padding: 24px;">
@@ -358,28 +295,23 @@ export class MailService {
 
     try {
       if (this.resend) {
-        const from = this.getResendFromAddress();
-        await this.resend.emails.send({
+        const { data, error } = await this.resend.emails.send({
           from,
           to: userEmail,
           subject,
           html,
         });
-        this.logger.log(`Targeted bounty email successfully sent via Resend to ${userEmail}`);
+
+        if (error) {
+          this.logger.error(`Resend API failed to send targeted bounty email to ${userEmail}: ${error.message}`);
+          return false;
+        }
+
+        this.logger.log(`Targeted bounty email successfully sent via Resend to ${userEmail} (ID: ${data?.id})`);
         return true;
       }
 
-      if (this.transporter) {
-        await this.transporter.sendMail({
-          from: `"Nexus Bounties" <${fromAddress}>`,
-          to: userEmail,
-          subject,
-          html,
-        });
-        this.logger.log(`Targeted bounty email successfully sent to ${userEmail}`);
-      } else {
-        this.logger.log(`[Dev Email Simulation] Targeted Bounty to ${userEmail}: "${postTitle}" by ${authorUsername}`);
-      }
+      this.logger.log(`[Dev Email Simulation] Targeted Bounty to ${userEmail}: "${postTitle}" by ${authorUsername}`);
       return true;
     } catch (error: any) {
       this.logger.error(`Failed to send targeted bounty email to ${userEmail}: ${error.message}`);
